@@ -1,0 +1,103 @@
+- become: yes
+  hosts: all
+  name: deploy-appwrite
+  user: ubuntu
+
+  tasks:
+    - name: Update all packages
+      apt:
+        upgrade: dist
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install a list of common dependancy packages
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - software-properties-common
+
+    # install docker
+
+    - name: docker gpg setup
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: add docker apt repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        update_cache: yes
+        state: present
+
+    - name: Update repositories cache
+      apt:
+        update_cache: yes
+
+    - name: Install docker-ce
+      apt:
+        name: docker-ce
+
+    - name: add ubuntu to docker
+      user:
+        name: ubuntu
+        group: docker
+
+    # install docker-compose
+    - name: get platform
+      shell: "uname -s"
+      args:
+        executable: /bin/bash
+      register: platform
+
+    - name: get architecture
+      shell: "uname -m"
+      args:
+        executable: /bin/bash
+      register: arch
+
+    - name: install docker-compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/1.27.4/docker-compose-{{platform.stdout}}-{{arch.stdout}}
+        dest: /usr/local/bin/docker-compose
+        mode: "u+x,g+x"
+
+    - name: Install Docker SDK for Python
+      apt:
+        pkg:
+          - python3
+          - python3-pip
+
+    - name: Update repositories cache
+      apt:
+        update_cache: yes
+
+    - name: Install Docker SDK for Python
+      pip:
+        name: "docker<5"
+      become: yes
+
+    - name: Install docker-compose SDK for Python
+      pip:
+        name: "docker-compose"
+      become: yes
+
+    # deploy appwrite
+    - name: Create appwrite directory
+      file:
+        path: /home/ubuntu/appwrite/
+        state: directory
+
+    - name: Copy docker-compose.yml
+      copy:
+        src: templates/docker-compose.yml
+        dest: /home/ubuntu/appwrite/docker-compose.yml
+
+    - name: Copy .env
+      copy:
+        src: templates/.env
+        dest: /home/ubuntu/appwrite/.env
+
+    - name: docker compose up
+      docker_compose:
+        project_src: /home/ubuntu/appwrite
