@@ -6,6 +6,10 @@ Appwrite is a self-hosted solution that provides developers with a set of easy-t
 
 We will use Terraform to provision the underlying infrastructure and manage configurations and deploy appwrite using Ansible.
 
+code for this tutorial can be found in 
+
+{% github RizkyRajitha/appwriteiac %}
+
 ### prerequisites
 
 - aws account [AWS free tier](https://aws.amazon.com/free/)
@@ -26,8 +30,7 @@ in this tutorial, we will be provision
 4. EC2 instance to deploy appwrite
 5. security groups to allow inbound(`http` , `https`) and outbound web traffic to EC2 instance to expose appwrite
 
-first, create a folder of your choice and then create `providers.tf` file .this file will hold information about our cloud provider.
-next, initialize terraform project using `terraform init` . this will allow terraform to download necessary binaries and initiate terraform.
+first, create a folder of your choice and then create `providers.tf` file . this file will hold information about the cloud provider. next, initialize terraform project using `terraform init` . this will allow terraform to download necessary binaries and initiate terraform.
 
 ### providers.tf
 
@@ -53,7 +56,9 @@ provider "aws" {
 }
 ```
 
-after that, we need to create our first component, AWS [VPC](https://aws.amazon.com/vpc/) . `VPC` stands for Virtual Private Cloud, which is like a complete network infrastructure layer for your cloud applications. next, we need to create a subnet in our `VPC`. this is where our EC2 instance is placed in the network. to expose this subnect to the internet we need to provision an [Internet Gateway](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html) and also [route table](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html) and [route table associations](https://docs.aws.amazon.com/vpc/latest/userguide/WorkWithRouteTables.html#AssociateSubnet) to associate the route table with this subnet.
+after that, we need to create our first component, AWS [VPC](https://aws.amazon.com/vpc/) . `VPC` stands for Virtual Private Cloud, which is like a complete network infrastructure layer for your cloud applications. next, we need to create a subnet in our `VPC`. this is where our EC2 instance is placed in the network.
+
+To expose this subnect to the internet we need to provision an [Internet Gateway](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Internet_Gateway.html) and also [route table](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html) and [route table associations](https://docs.aws.amazon.com/vpc/latest/userguide/WorkWithRouteTables.html#AssociateSubnet) to associate the route table with this subnet.
 
 ### network.tf
 
@@ -109,10 +114,16 @@ resource "aws_route_table_association" "racappwriteiacdemo" {
 
 after that, we need to specify the [security groups](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html) to allow web traffic to the EC2 instance we are provisioning. for that create `securitygroups.tf` file.
 
-here we provision 3 security groups.
+here we provision 4 security groups.
 
-1.allow http ingress traffic (allow inbound http traffic to EC2) port 80 2. allow https ingress traffic (allow inbound https traffic to EC2) port 443
-3.allow all egress traffic (allow all outbound traffic to EC2)
+1. allow http ingress traffic (allow inbound http traffic to EC2) : port `80` 
+
+2. allow https ingress traffic (allow inbound https traffic to EC2) : port `443`
+
+3. allow ssh ingress traffic (allow inbound ssh traffic to EC2) : port `22`
+
+4. allow all egress traffic (allow all outbound traffic to EC2)
+
 
 ### securitygroups.tf
 
@@ -175,12 +186,14 @@ resource "aws_security_group" "sg_allow_all_egress_appwriteicademo" {
 }
 ```
 
-we are now almost there, just need to create our `main.tf` file where we specify EC2 instance to provision
+now we are almost there, just need to create our `main.tf` file where we specify EC2 instance to provision.
 
 in this tutorial, we will provision `t2 small` EC2 instance to the public subnet we created in our previous steps.
-I choose `t2 small` instance type because the minimum requirements to run Appwrite is 1 CPU core and 2GB of RAM which matches with `t2 small` instance type. [AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html) we use here is Ubuntu Server 20.04 LTS (HVM). security groups we created earlier also have specified to our EC2 instance along with subnet.
+I choose `t2 small` instance type because the [minimum requirements](https://appwrite.io/docs/installation#systemRequirements) to run Appwrite is 1 CPU core and 2GB of RAM which matches with [t2 small](https://aws.amazon.com/ec2/instance-types/t2/) instance type.
 
-**here make sure you added your key pair name in `key_name` value.**
+[AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html) we use here is `Ubuntu Server 20.04 LTS (HVM)`.security groups we created earlier also have specified to our EC2 instance along with the subnet.
+
+**Make sure you added your key pair name in `key_name` value.**
 
 ### main.tf
 
@@ -206,19 +219,19 @@ output "public-ip" {
 
 ```
 
-now we have all the elements we need, let's apply this configuration using `terraform apply`.
+now we have all the elements we need, let's apply this configuration using `terraform apply` command.
 
-### folder structure
+### terraform output
 
-### tf output
-
-![terraform output](tfoutput.png)
+![terraform output](./tfoutput.png)
 
 make sure you can connect to the EC2 instance using the key pair you specified before proceeding to the next steps.
 
 ### aws network diagram
 
-![aws network diagram](./netdigram.png)
+![aws network diagram](/netdigram.png)
+
+<br>
 
 ## Manage configurations and deploy appwrite using Ansible
 
@@ -232,7 +245,13 @@ your-ec2-public-ip-address
 
 our newly provisioned EC2 instance has a fresh copy of ubuntu, so we need need to install [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) to deploy appwrite.
 
-next, create a `main.yml` file as the ansible playbook . in this file, we will have all the tasks we need to deploying appwrite. first, we will update apt packages, and install dependency packages for docker and docker-compose .next we will install docker and docker-compose. finally, we will copy the `docker-compose.yml` and `.env` files to EC2 instance deploy appwrite using docker-compose.
+We can start by creating `main.yml` file as the ansible playbook . in this file, we will have all the tasks we need to execute deploy appwrite.
+
+First, we will update apt packages, and install dependency packages for docker and docker-compose . 
+
+Next we will install docker and docker-compose. 
+
+Finally, we will copy the `docker-compose.yml` and `.env` files (which we will download in the next step) to EC2 instance deploy appwrite using docker-compose.
 
 ### main.yml
 
@@ -342,33 +361,42 @@ next, create a `main.yml` file as the ansible playbook . in this file, we will h
       register: output
 ```
 
-### final folder structure
+Now create `templates` directory and add `docker-compose.yml` and `.env` files to `templates` directory from this GitHub gist.
 
-![folder structure](folderstructure.png)
-
-next, create `templates` directory and download `docker-compose.yml` and `.env` files from this GitHub gist
+[GitHub gist](https://gist.github.com/eldadfux/977869ff6bdd7312adfd4e629ee15cc5)
 
 {% gist https://gist.github.com/eldadfux/977869ff6bdd7312adfd4e629ee15cc5 %}
 
 [Appwrite docs](https://appwrite.io/docs/installation#manual)
 
-now we have all the pieces in hand, let's run ansible playbook using the following command. in this command, we pass the `main.yml` as our playbook
-`-i` flag to pass our inventory file `hosts` `--private-key` flag and pass the key pair created to ssh EC2 instance.
+### final folder structure
+
+![folder structure](./folderstructure.png)
+
+Now we have all the pieces in hand, let's run ansible playbook using the following command.
+
+In this command, we pass `main.yml` as our playbook
+`-i` flag to pass our inventory file `hosts` 
+
+`--private-key` flag to pass the key pair, to ssh EC2 instance.
 
 `ansible-playbook main.yml -i hosts --private-key [path-to-your-key] `
 
-let's run ansible playbook and watch the magic happens 🪄.
+Let's run ansible playbook and watch the magic happens 🪄.
 
-![ansible output](ansibleout.png)
+![ansible output](./ansibleout.png)
 
-after successfully running ansible playbook now you can visit your EC2 public ip address and view the appwrite signup page.
+After successfully running ansible playbook now you can visit your EC2 public ip address and view the appwrite signup page.
 
-![appwrite signup page](signup.png)
+![appwrite signup page](./signup.png)
 
-now we can use appwrite and start building applications.
+Now we can use appwrite and start building applications.
 
-![appwrite dashbaord](appwritedashbaord.png)
+![appwrite dashbaord](./appwritedashbaord.png)
 
 <br>
 
-![node sdk out](nodesdk.png)
+![node sdk out](./nodesdk.png)
+
+## Thanks for reading till the end 🙌
+## Cheers 🥂
